@@ -58,6 +58,10 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.3.1")
 
 
+    //Closing System Bar and Navigation Bar
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.28.0")
+
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
