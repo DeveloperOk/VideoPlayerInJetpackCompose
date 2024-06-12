@@ -32,16 +32,35 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.ViewModelProvider
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.enterprise.videoviewjetpackcompose.ui.theme.VideoViewJetpackComposeTheme
 import com.google.accompanist.systemuicontroller.SystemUiController
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    lateinit var mainViewModel: MainViewModel
+    lateinit var playerView: PlayerView
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val videoUrl ="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+        val mediaItem = MediaItem.fromUri(videoUrl)
+
+        mainViewModel = ViewModelProvider(this)[MainViewModel::class.java]
+
+        mainViewModel.player = ExoPlayer.Builder(this).build()
+        mainViewModel.player?.setMediaItem(mediaItem)
+        playerView = PlayerView(this)
+        playerView.player = mainViewModel.player
+
         enableEdgeToEdge()
         setContent {
             VideoViewJetpackComposeTheme {
@@ -53,7 +72,7 @@ class MainActivity : ComponentActivity() {
                             .padding(10.dp, 10.dp)
                             .fillMaxSize()
                             ){
-                        VideoPlayerDemo()
+                        VideoPlayerDemo(mainViewModel, playerView)
                     }
 
                 }
@@ -64,34 +83,25 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun VideoPlayerDemo() {
+fun VideoPlayerDemo(mainViewModel: MainViewModel, playerView: PlayerView) {
 
     //Do not forget to add the following permissions to the manifest
     // <uses-permission android:name="android.permission.INTERNET" />
     // <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
 
-    val videoUrl ="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
     val context = LocalContext.current
     val playWhenReady by rememberSaveable {
         mutableStateOf(true)
     }
 
-    var playerView = remember { mutableStateOf<PlayerView>(PlayerView(context))}
+    LaunchedEffect(mainViewModel.player) {
 
-    LaunchedEffect(true) {
+       mainViewModel.player?.prepare()
+       mainViewModel.player?.playWhenReady = playWhenReady
 
-            val player = ExoPlayer.Builder(context).build()
-            //playerView.value = PlayerView(context)
-            val mediaItem = MediaItem.fromUri(videoUrl)
-
-            player.setMediaItem(mediaItem)
-            playerView.value.player = player
-
-            player.prepare()
-            player.playWhenReady = playWhenReady
+        mainViewModel.lastPosition?.let{mainViewModel.player?.seekTo(it)}
 
     }
-
 
     val systemUiController: SystemUiController = rememberSystemUiController()
     disableStausBarAndNavigationBar(systemUiController)
@@ -101,20 +111,27 @@ fun VideoPlayerDemo() {
         disableStausBarAndNavigationBar(systemUiController)
     }
 
-
     AndroidView( factory = {
-        playerView.value.apply {
+
+        playerView.apply {
+
             setFullscreenButtonClickListener { isFullScreen ->
+
+                player = mainViewModel.player
                 backHandlingEnabled.value = isFullScreen
+                mainViewModel.lastPosition = (player as ExoPlayer).currentPosition
+
                 with(context) {
                     if (isFullScreen) {
                         setScreenOrientation(
                             orientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         )
+
                     } else {
                         setScreenOrientation(
                             orientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                         )
+
                     }
                 }
             }
